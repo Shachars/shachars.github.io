@@ -1,0 +1,42 @@
+# jemdoc: menu{MENU}{index.html}, nofooter  
+==Shachar Shayovitz 
+
+~~~
+{}{img_left}{photos/Shachar Shayovitz.jpg}{alt text}{150}{210}
+PhD Candidate,\n [http://www.eng.tau.ac.il Department of Electrical Engineering], \n[http://www.tau.ac.il Tel Aviv University (TAU)]\n
+Tel Aviv, Israel \n 
+E-post: /shachar.shay/ \[@\] gmail \[DOT\] com \n
+GitHub \[[https://github.com/Shachars?tab=repositories Link]\] \n
+Google Scholar \[[https://scholar.google.co.il/citations?user=6LgtCXMAAAAJ&hl=en Link]\]\n
+Google Patents \[[https://patents.google.com/?inventor=shachar+shayovitz&oq=shachar+shayovitz Link]\]
+
+~~~
+
+== About me
+I am studying towards my PhD in Electrical Engineering under the supervision of Prof. Meir Feder. I am currently working on the relationship between Information Theory and Machine Learning (In particular active and online learning).\n I am also a part time radar researcher at General Motors Advanced Technical Center Israel (GM-ATCI), working on future sensing systems for autonomous vehicles.\n
+I've spent several years working on algorithms for communications and radar systems at Intel, Vayyar Imaging, Corning Optical Communications and General Motors.
+
+== Research
+My research interests include 
+- Information Theory  
+- Machine Learning
+- Radar Signal Processing
+- Statistical Signal Processing
+
+=== Publications 
+. Shachar Shayovitz, Dan Raphaeli, \"Improved message passing algorithm for phase noise channels using optimal approximation of Tikhonov mixtures\", In Proceedings of the 5th International Symposium on Communications Control and Signal Processing (ISCCSP), 2012. \[[pub/oppTOSN.pdf pdf]\] \[[Poster]\]
+. Shayovitz, Shachar, Raphaeli, Dan, \"Efficient iterative decoding of LDPC in the presence of strong phase noise\",  In Proceedings of the 7th International Symposium on Turbo Codes and Iterative Information Processing (ISTC), 2012. \[[https://arxiv.org/pdf/1210.5198.pdf] \] \[[Presentation]\]
+. Shachar Shayovitz, Dan Raphaeli, \"Multiple hypotheses iterative decoding of LDPC in the presence of strong phase noise\", In Proceedings of the IEEE 27th Convention of Electrical & Electronics Engineers in Israel (IEEEI), 2012 . \[[https://arxiv.org/pdf/1210.5198.pdf] \] \[[Presentation]\]
+. Shachar Shayovitz, Dan Raphaeli, \"A signal constellation for pilotless communications over Wiener phase noise channels\", In Proceedings of the IEEE Global Communications Conference (GLOBECOM), 2013. \[[https://arxiv.org/pdf/1304.0110.pdf]\] \[[Presentation]\]
+. Shayovitz, Shachar; Raphaeli, Dan \" Message passing algorithms for phase noise tracking using tikhonov mixtures\", IEEE Transactions on Communications, 2016. \[[http://arxiv.org/abs/1306.2454 arxiv]\]
+
+=== Patents
+. Shachar Shayovitz, “Temperature compensated dielectric characterization of substances”, Filed April 20, 2016. US Patent Provisional No 20160313259
+. Yuval Lomniz, Jonathan Rosenfeld, Doron Cohen, Shachar Shayovitz, “System devise and methods for measuring substances' dielectric properties using microwave sensors”, Filed April 26 2016, US Patent Provisional NO 2016050440
+. Raviv Melamed, Moshe Shay, Damian Hoffman, Shachar Shayovitz, Rohi Halimi, “System and method for measuring an object location and/or orientation using radio frequency propagation measurements”, Filed June 6 2016, US Patent Provisional 20160356877
+
+=== Unpublished Work
+. Shachar Shayovitz, Dan Raphaeli, \"Correction to "Dynamically regularized RLS-DCD
+algorithm and its FPGA implementation\", October 2017. \[[pub/oppTOSN.pdf pdf]\]
+. M.Sc Thesis \" Message passing algorithms for phase noise tracking using tikhonov mixtures\", \[[Book]\] \[[Seminar Presentation]\]
+

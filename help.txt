@@ -1,0 +1,12 @@
+download and install Python 2.3 or later compatible with your OS.
+
+download http://www.jemdoc.jaboc.net/dist/jemdoc.py (v0.6.8). and copy it inside your working directory.
+
+you can download example css file and copy it inside your working dierectory, you also can costomize your favorite style file.
+
+now you can start editing your basic html file. see example page and menu file which i provided for the first page.
+
+type jemdoc.py filename.jemdoc in command prompt inside your working directory to compile your markup htm file.
+
+visit jemdoc website for further information.
+Good Luck
