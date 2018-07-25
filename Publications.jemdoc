@@ -1,0 +1,12 @@
+# jemdoc: menu{MENU}{Publications.html}, nofooter  
+=== Publications 
+
+. Shachar Shayovitz, Dan Raphaeli, \"Improved message passing algorithm for phase noise channels using optimal approximation of Tikhonov mixtures\", In Proceedings of the 5th International Symposium on Communications Control and Signal Processing (ISCCSP), 2012. \[[http://ieeexplore.ieee.org/abstract/document/6217783/ pdf]\] \[[isccsp_poster.pdf Poster]\]
+. Shayovitz, Shachar, Raphaeli, Dan, \"Efficient iterative decoding of LDPC in the presence of strong phase noise\",  In Proceedings of the 7th International Symposium on Turbo Codes and Iterative Information Processing (ISTC), 2012. \[[https://arxiv.org/pdf/1204.2660.pdf pdf] \] \[[istc.pdf Presentation]\]
+. Shachar Shayovitz, Dan Raphaeli, \"Multiple hypotheses iterative decoding of LDPC in the presence of strong phase noise\", In Proceedings of the IEEE 27th Convention of Electrical & Electronics Engineers in Israel (IEEEI), 2012 . \[[https://arxiv.org/pdf/1210.5198.pdf pdf] \] \[[ieeei.pdf Presentation]\]
+. Shachar Shayovitz, Dan Raphaeli, \"A signal constellation for pilotless communications over Wiener phase noise channels\", In Proceedings of the IEEE Global Communications Conference (GLOBECOM), 2013. \[[https://arxiv.org/pdf/1304.0110.pdf pdf]\] \[[globecom.pdf Presentation]\]
+. Shayovitz, Shachar; Raphaeli, Dan \" Message passing algorithms for phase noise tracking using tikhonov mixtures\", IEEE Transactions on Communications, 2016. \[[http://ieeexplore.ieee.org/document/7349155/ pdf]\]
+. Shachar Shayovitz, Dan Raphaeli, \"Robust Low Complexity Digital Self Interference Cancellation for Multi Channel Full Duplex Systems\", In Proceedings of the IEEE Statistical Signal Processing Workshop (SSP), 2018. \[[self_interference_conf_ssp2018.pdf pdf]\] \[[posterSSp2018.pdf Poster]\]
+. Shachar Shayovitz, Dan Raphaeli, \"Correction to "Dynamically regularized RLS-DCD
+algorithm and its FPGA implementation\", Unpublished October 2017. \[[correction.pdf pdf]\]
+. M.Sc Thesis \" Message passing algorithms for phase noise tracking using tikhonov mixtures\", \[[thesis_book.pdf Book]\] \[[thesis_ppt.pdf Seminar Presentation]\]
