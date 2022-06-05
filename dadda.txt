@@ -1,0 +1,280 @@
+function [das_images,das_images_cf,xi_region,yi_region,zi_region,groups,refl_indicators,GeneratedData] = Model_AlgDAS(Measurements, measIndex, Cfg, GeneratedData, C, flag_store_refl, progressFileName)
+das_images = {}; das_images_cf = [];
+%% Load Simulation results calibration file
+% SimAntsGainCfg = Cfg.Calib.SimAntsGain;
+% sim_calib=GeneratedData.Ant_sim_calib;
+
+
+%% Init Stage for single region, single voxel region
+
+if isempty(Measurements)
+    %Single calibration region, single Voxel region
+    
+    
+    % Build the Arena 
+    GeneratedData.DASArena = BuildArenaParams(Cfg.Calib.SimAntsGain,Cfg.Arena);
+    GeneratedData.DASArena.isInterpolatorPrecalculated = false;
+
+    
+    %Memory considerations:
+    % If we pre-calcualte the DAS arean, the structure
+    % GeneratedData.DASArena will have a size of approximatelly numVoxels
+    % KB (The real number is around 0.85 KB per voxel for 90 pairs), but taking 1 KB is
+    % more conservative, and the condition is nicer looking)
+    
+    EstimatedMemoryInKB = size(GeneratedData.DASArena.calib_region_inds{1},2) * size(GeneratedData.Ants_Tx_Rx_Pairs, 1)/90; % const * size of image X num pairs
+    
+    if (size(GeneratedData.DASArena.region_loc,1)==1) && EstimatedMemoryInKB < Cfg.Common.voxelPreCalculateMemoryKB
+        nants = size(GeneratedData.Ants_Locations,1);
+        nvoxels = size(GeneratedData.DASArena.calib_region_inds{1},2);
+        region_voxel_idx = GeneratedData.DASArena.calib_region_inds{1};
+        voxel_idx = region_voxel_idx(1:end);
+        xi_arena_per_region = GeneratedData.DASArena.xi_arena_vec(voxel_idx);
+        yi_arena_per_region = GeneratedData.DASArena.yi_arena_vec(voxel_idx);
+        zi_arena_per_region = GeneratedData.DASArena.zi_arena_vec(voxel_idx);
+        GeneratedData.DASArena.pair_to_voxel_path = PathEstimator(nants,nvoxels,xi_arena_per_region,yi_arena_per_region,zi_arena_per_region,Cfg, GeneratedData, C);
+        if (Cfg.DAS.pulse_samples==0)
+            % Integer DAS - compute interpolation parameters
+            recording_samples = GeneratedData.FreqToTime.Nfft;
+            % flag_use_inside_cup_validation = Cfg.Common.flag_inside_cup_validation;
+            ts_mat_tmp = GeneratedData.DASArena.pair_to_voxel_path.Ts_pair_to_voxel; % this is a matrix of voxels X pairs
+            ts_mat_tmp = min(ts_mat_tmp,recording_samples); % Notice the actual time signal may be shorter due to trimming on F->T conversion (see MeasurementsPreprocessing.m), however this doesn't affect the linear index.
+            ts_mat_tmp = max(ts_mat_tmp,1);
+            %% Compute DAS weights
+            % ts_mat_valid = bsxfun(@times,(ts_mat_tmp>=1).*(ts_mat_tmp<recording_samples),GeneratedData.DASArena.pair_to_voxel_path.inside_cup_validation_mat)*(flag_use_inside_cup_validation) + (ts_mat_tmp>=1).*(ts_mat_tmp<recording_samples)*(1-flag_use_inside_cup_validation); % ts_mat is a matrix of voxelsXpairs
+            % ts_mat_tmp = ts_mat_tmp.*ts_mat_valid + 1*(~ts_mat_valid); % Zero delay match the first sample. This line suspected as unncessary since ts_mat_tmp is bounded between 1 and recording_samples
+            ts_mat_ind_low = fix(ts_mat_tmp);
+            pair_ix_mat =  (1:1:size(ts_mat_tmp,1)).';
+            idx_low = bsxfun(@plus,pair_ix_mat,(ts_mat_ind_low-1)*size(GeneratedData.Ants_Tx_Rx_Pairs,1));
+            if max(idx_low(:)) < (2^16)
+                GeneratedData.DASArena.idx_low = uint16(idx_low); % Applicable in most (short range) arenas and reduces vector size
+            else % Notice: 32 bit is not supported in C because it cannot have varibale type.
+                %%<cpp_include> error('Internal error: Keeping idx_low as uint32 (long DAS arena) not supported in C.');
+                GeneratedData.DASArena.idx_low = uint32(idx_low); % keep as unit32 (more efficient than double which is 64 bit).
+            end;
+            GeneratedData.DASArena.slope = ts_mat_tmp - ts_mat_ind_low;
+            
+            GeneratedData.DASArena.isInterpolatorPrecalculated = true;
+        end
+    end
+    das_images= [];
+    das_images_cf=[];
+    xi_region=[];
+    yi_region=[];
+    zi_region=[];
+    groups={};
+    refl_indicators={};
+    return
+end % end Init stage
+
+%% Load the reduced leakage signals
+S_mat  = Measurements(measIndex).S_mat; % switches calibration and leakage reduction is done in Do_calibration function.
+freqs = Measurements(measIndex).Freqs;
+
+%% Prepare the arena
+%%<cpp_commented
+if Cfg.Common.Verbose >= 2
+    disp('Start preparing calibration....');
+end;
+%%cpp_commented>
+% xi = GeneratedData.DASArena.xi;
+xi_arena_vec = GeneratedData.DASArena.xi_arena_vec;
+yi_arena_vec = GeneratedData.DASArena.yi_arena_vec;
+zi_arena_vec = GeneratedData.DASArena.zi_arena_vec;
+xi_region = GeneratedData.DASArena.xi_region;
+yi_region = GeneratedData.DASArena.yi_region;
+zi_region = GeneratedData.DASArena.zi_region;
+
+
+%% Prepare algorithm flags and variables
+npairs = size(GeneratedData.Ants_Tx_Rx_Pairs,1); % number of pairs in the system
+VoxelTh = ceil(Cfg.Common.voxelPreCalculateMemoryKB / (npairs / 90)); % maximum size of voxels vector (image unit operated upon at once). Calculated so that the memory consumption of e.g. ts_mat will be voxelPreCalculateMemoryKB 
+flag_use_inside_cup_validation = Cfg.Common.flag_inside_cup_validation;
+num_regions = size(GeneratedData.DASArena.region_loc,1);
+nants = size(GeneratedData.Ants_Locations,1);
+recording_samples = GeneratedData.FreqToTime.Nfft; % number of samples per recorded signal.
+groups = GeneratedData.groups;
+num_groups = length(groups);
+
+pairs_to_sum_per_image = zeros(num_groups,npairs);
+for gr_i = 1:num_groups
+    pairs_to_sum_per_image(gr_i,groups{1,gr_i}.org_pairs_ind) = ones(1,length(groups{1,gr_i}.org_pairs_ind)); % create a matrix of the pairs in each group
+end
+num_pairs_per_group = sum(pairs_to_sum_per_image.',1); % vector of numebr of active pairs in each group
+sum_y = zeros(num_groups,numel(xi_arena_vec)); % sum of the signal samples times the weights - the estimator
+sum_ref = zeros(num_groups,numel(xi_arena_vec)); % normalization of the estimator using the pathloss estimation
+r = zeros(num_groups,numel(xi_arena_vec)); %
+coh_factor = zeros(num_groups,numel(xi_arena_vec));
+weight_cap = 10^(Cfg.DAS.pathLossComp_GainLimit_dB/20); % the maximum of the relative weight due to pathloss
+coherent_factor_lamda_sqr = 10^(2*Cfg.DAS.coherent_factor_lamda_dbm/20);
+
+pulse_samples = 0;
+if (Cfg.DAS.pulse_samples>0)
+    pulse_samples = Cfg.DAS.pulse_samples;
+    warning('Using integral DAS - make sure you are not assuming linearity of the das estimator...');
+end
+mx_value = zeros(1,size(GeneratedData.Ants_Tx_Rx_Pairs,1)); % will contain the maximum value of each pair
+
+% calculateReflMatrixPerRegion: 
+% when false (default for real time applications), we use the S_mat_td calculated in MeasurementsPreprocessing.
+% If there is more than one region, we calibrate and perform freq->time conversion per region. Notice we do not use S_mat_td prepared by MeasurementsPreprocessing in order to avoid differences (e.g. whitening) between regions.        
+% Also, if S_mat_td does't exist - this is to support simulations that run DAS externally (although correct way is to run prepareInitialDatabase & MeasurementsPreprocessing).
+calculateReflMatrixPerRegion = (num_regions == 1);
+%% <cpp_commented
+calculateReflMatrixPerRegion = calculateReflMatrixPerRegion || ~isfield(Measurements(measIndex), 'S_mat_td');
+%% cpp_commented>
+
+
+%% Main DAS loop
+%%<cpp_commented
+if Cfg.Common.Verbose >= 2
+    disp('Starting DAS calculation');
+    time_estimate_multitask(0);
+end;
+%%cpp_commented>
+voxels_done = 0;
+
+
+
+for region_ind=1:num_regions
+    
+    %% init voxel division, if the voxel size is too large
+    region_voxel_idx = GeneratedData.DASArena.calib_region_inds{region_ind};
+
+    if num_regions == 1 
+        refl_matrix = Measurements(measIndex).S_mat_td; % already prepared by MeasurementsPreprocessing        
+    else % more than one region. In this case we calibrate and perform freq->time conversion per region. Notice we do not use S_mat_td prepared by MeasurementsPreprocessing in order to avoid differences (e.g. whitening) between regions.        
+        %% Calibrate the antenna gain per region location
+        S_calibed = CalibrateAntForRegion(Cfg.Calib.SimAntsGain,S_mat,npairs,GeneratedData.Ant_sim_calib,GeneratedData.DASArena.region_loc,region_ind,freqs,Cfg, GeneratedData, C);
+        
+        %% Transform the signals to time domain
+        refl_matrix = TimeDomainFromS(S_calibed,freqs,Cfg.FreqToTime.Window,GeneratedData.FreqToTime.Nfft,Cfg.FreqToTime.TimeDomainMethod);
+    end;
+    
+    %%<cpp_commented
+    %% Find and save the maximum value for debugging and dynamic range calibration
+    mx_value = max(max(abs(refl_matrix),[],2).',mx_value);
+    %%cpp_commented>
+    
+    %% Compute the log-likelihood of a target at each voxel
+    for voxel_start=1:VoxelTh:length(region_voxel_idx)
+        
+        voxel_idx = region_voxel_idx(voxel_start:min(voxel_start+VoxelTh-1, end));
+        nvoxels = length(voxel_idx);
+        
+        %% Select the voxels to perform DAS on
+        xi_arena_per_region = xi_arena_vec(voxel_idx);
+        yi_arena_per_region = yi_arena_vec(voxel_idx);
+        zi_arena_per_region = zi_arena_vec(voxel_idx);
+        
+        %% Compute the required sample for all voxel points in a region and for all the pairs
+        
+        %single calibration region, single DAS region
+        if GeneratedData.DASArena.isInterpolatorPrecalculated
+            % TODO: in this mode pair_to_voxel_path is used for nothing of very big importance (like cup validation) .. consider identifying
+            % this situation and cut directly to the interpolation.
+            pair_to_voxel_path = GeneratedData.DASArena.pair_to_voxel_path;
+        else
+            pair_to_voxel_path = PathEstimator(nants,nvoxels,xi_arena_per_region,yi_arena_per_region,zi_arena_per_region,Cfg, GeneratedData, C);
+        end;
+        %   pair_relative_weight_due_to_pathloss (npairsXnvoxels)
+        if (Cfg.DAS.pathLossComp_Mode == 0) || (Cfg.RayParams.RayTracerEnable)
+            % Shortcut to improve run time
+            pair_relative_weight_due_to_pathloss = 1;
+            is_num_active_pairs_above_threshold = 1;
+        else
+            pair_relative_weight_due_to_pathloss = min(pair_to_voxel_path.est_gain_to_point.^(-Cfg.DAS.pathLossComp_InversionFactor), weight_cap).*(pair_to_voxel_path.est_gain_to_point ~= 0); % this is the weight (which will be multiplied with the skin) to produce the weight of the estimator
+            is_num_active_pairs_above_threshold = sum(pair_relative_weight_due_to_pathloss ~= 0,1) >= Cfg.DAS.NumberOfPairsThreshold;
+        end
+        
+        %% Run over all the voxels and sum up the pairs
+        for pulse_sample = (-pulse_samples/2):(pulse_samples/2)
+            
+            %% Sample time matrix
+            ts_mat_tmp = pair_to_voxel_path.Ts_pair_to_voxel+pulse_sample; % this is a matrix of voxels X pairs
+            ts_mat_tmp = max(min(ts_mat_tmp,recording_samples),1);
+            %% Compute DAS weights
+%             ts_mat_valid = bsxfun(@times,(ts_mat_tmp>=1).*(ts_mat_tmp<recording_samples),pair_to_voxel_path.inside_cup_validation_mat)*(flag_use_inside_cup_validation) + (ts_mat_tmp>=1).*(ts_mat_tmp<recording_samples)*(1-flag_use_inside_cup_validation); % ts_mat is a matrix of voxelsXpairs
+            if flag_use_inside_cup_validation
+                ts_mat_valid = bsxfun(@times,ones(size(ts_mat_tmp)),pair_to_voxel_path.inside_cup_validation_mat);
+            else
+                ts_mat_valid = 1;
+            end
+            ts_mat_tmp = min(ts_mat_tmp, size(refl_matrix,2)); % Zero delay match the first sample.  cap by the refl matrix size as protection from case the arena exceeds the ambiguity point (not recommended but possible; another option would be to wrap around)
+            pair_relative_weight = pair_relative_weight_due_to_pathloss; %todo - use the path estimator only for physical quanteties
+            
+            %% Find the contribution from each pair and sum up
+            %single calibration region, single DAS region, integer DAS
+            if GeneratedData.DASArena.isInterpolatorPrecalculated
+                signal_for_summation = refl_matrix(GeneratedData.DASArena.idx_low).*(1-GeneratedData.DASArena.slope) +refl_matrix(GeneratedData.DASArena.idx_low+npairs).*GeneratedData.DASArena.slope;
+%                 signal_for_summation = MexTestintep(refl_matrix,GeneratedData.DASArena.idx_low,GeneratedData.DASArena.idx_low+npairs,GeneratedData.DASArena.slope);
+            else
+%                 signal_for_summation = Func_CalcSignalValueInTime_AllPairs(refl_matrix, ts_mat_tmp); % signal_for_summation should be voxelsXpairs
+                signal_for_summation = Mex_CalcSignalValueInTime_AllPairs(refl_matrix, ts_mat_tmp);
+            end
+            signal_valid = signal_for_summation.*ts_mat_valid;
+            sum_y(:,voxel_idx) = sum_y(:,voxel_idx) + bsxfun(@times, is_num_active_pairs_above_threshold, ((signal_valid .*pair_relative_weight).'*pairs_to_sum_per_image.').'); % summing up the pairs for each group
+            sum_ref(:,voxel_idx) = sum_ref(:,voxel_idx) + ((pair_to_voxel_path.est_gain_to_point .* pair_relative_weight).'*pairs_to_sum_per_image.').' + Cfg.DAS.wiener_factor; % used later to normalize the sum
+            %% Coherence factor
+            if (Cfg.DAS.flag_use_coherent_factor)
+                sigma2_est = var_est(signal_valid,pairs_to_sum_per_image.',pair_to_voxel_path.est_gain_to_point); % computes the unbiased variance of a random variable with non zero expectation
+                if(Cfg.DAS.Coherent_factor_var_est_norm)
+                    eng_weight = ((pair_relative_weight.^2).'*pairs_to_sum_per_image.').';
+                else
+                    eng_weight = 1;
+                end
+                r(:,voxel_idx) = sum_y(:,voxel_idx) ./ sum_ref(:,voxel_idx);
+                if (Cfg.DAS.choose_cf_est == 2)
+                    coh_factor(:,voxel_idx) = coh_factor(:,voxel_idx) + (r(:,voxel_idx).^2)./(r(:,voxel_idx).^2 + sigma2_est./eng_weight + coherent_factor_lamda_sqr); %todo - the npairs is wrong, when using groups it changes
+                end
+                if (Cfg.DAS.choose_cf_est == 1)
+                    coh_factor(:,voxel_idx) = coh_factor(:,voxel_idx) + (r(:,voxel_idx).^2 - sigma2_est./eng_weight)./(r(:,voxel_idx).^2 + coherent_factor_lamda_sqr); %todo - the npairs is wrong, when using groups it changes
+                    coh_factor (coh_factor<0) = 0;
+                end
+            end
+        end
+        voxels_done = voxels_done  + nvoxels;
+        %%<cpp_commented
+        if Cfg.Common.Verbose >= 2
+            time_estimate_multitask([region_ind, voxels_done], [size(GeneratedData.DASArena.region_loc,1), length(GeneratedData.DASArena.calib_region_inds{region_ind})]); % countings separately "per region" and "per voxel" efforts.
+        end;
+        %%cpp_commented>
+    end % voxel groups
+end % region_ind
+
+%%<cpp_commented
+if Cfg.Common.Verbose >= 2
+    disp(sprintf('Total DAS runtime: %d secs', round(toc)));
+end;
+
+%% Compute the new processing gain
+[~, i] = max(abs(sum_y(1,:) ./ sum_ref(1,:))); % finds the maximum point's index
+pair_to_voxel_path1 = PathEstimator(size(GeneratedData.Ants_Locations,1),1,xi_arena_vec(i),yi_arena_vec(i),zi_arena_vec(i),Cfg, GeneratedData, C);
+ts_vec = pair_to_voxel_path1.Ts_pair_to_voxel;
+ts_vec_round = round(ts_vec);
+ts_vec_round = min(max(ts_vec_round,1), size(refl_matrix,2));
+signal_for_summation = Func_CalcSignalValueInTime_AllPairs(refl_matrix, ts_vec_round);  % todo - using the reflection matrix which is based on the last region!!!
+pk_to_avg_sig_db = 20*log10(abs((sum(signal_for_summation)./(sum(mx_value)/length(mx_value)))));%compute_proc_gain_raw()
+proc_gain = sum(signal_for_summation./mx_value.');%compute_proc_gain_raw()
+%%cpp_commented>
+
+
+%% Normalize
+for gr_i = 1:num_groups
+    if (Cfg.DAS.pulse_samples>0)
+        das_images{gr_i} = sqrt(reshape(sum_y(gr_i,:) ./ sum_ref(gr_i,:)*num_pairs_per_group(gr_i) ,size(GeneratedData.ImgMask)));    % todo - npairs depends on the group chosen , put the 1/npairs in the matrix pairs_to_sum_per_image - 1/3 if there are 3
+    else
+        das_images{gr_i} = (reshape(sum_y(gr_i,:) ./ sum_ref(gr_i,:)*num_pairs_per_group(gr_i) ,size(GeneratedData.ImgMask)));    % todo - npairs depends on the group chosen , put the 1/npairs in the matrix pairs_to_sum_per_image - 1/3 if there are 3
+    end
+    if (Cfg.DAS.flag_use_coherent_factor)
+        das_images_cf{gr_i} = reshape(coh_factor(gr_i,:).'/length((-pulse_samples/2):(pulse_samples/2)),size(GeneratedData.ImgMask)); % todo - do we need this averaging?
+    end
+end
+
+%%<cpp_commented
+if Cfg.Common.Verbose >= 1
+    fprintf('Maximum of max values per antennas pair recording is: %0.2f  db\n',20*log10(max(mx_value)));
+    fprintf('Sum of max values per antennas pair recording is: %0.2f  db\n',20*log10(sum(mx_value)));
+end;
+refl_indicators = [max(mx_value), sum(mx_value), sum(mx_value)/length(mx_value),proc_gain,pk_to_avg_sig_db]; % todo - change to matrix form when groups are enabled
+%%cpp_commented>

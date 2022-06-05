@@ -1,0 +1,285 @@
+%%<cpp_commented
+function pair_to_voxel_path = PathEstimator(nants,nvoxels,xi_arena_per_region,yi_arena_per_region,zi_arena_per_region,Cfg, GeneratedData, C, explicit_TargetModel)
+%%cpp_commented>
+%%<cpp_include> function pair_to_voxel_path = PathEstimator(nants,nvoxels,xi_arena_per_region,yi_arena_per_region,zi_arena_per_region,Cfg, GeneratedData, C, explicit_TargetModel=[])
+
+% This function returns a struct containing the following matricies (for each antennas pair and voxel):
+%   1. pair_to_voxel_path.inside_cup_validation_mat (npairsXnvoxels)
+%   2. pair_to_voxel_path.Ts_pair_to_voxel (npairsXnvoxels) index into refl_matrix (S_mat_td), starts from 1.
+%   3. r_path_in_each_medium_ant (num_layersXnpairsXnvoxels)
+%   number of mediums and correct the dimensions
+%   4. pair_to_voxel_path.est_gain_to_point (npairsXnvoxels)
+% Input :
+%   Cfg.DAS,nants,nvoxels,Stp,xi_arena_per_region,yi_arena_per_region,zi_arena_per_region,C,
+%   allow_multiple_hypotheses
+%
+% allow_multiple_hypotheses is a flag that controls whether it is allowed
+% to generate multiple hypotheses (for various models simultanously). If
+% true, then pair_to_voxel_path.Ts_pair_to_voxel and other arrays may have
+% a 3rd dimension which is the hypothesis index. This is currently used
+% only in mode of pipes, to scan over pipe orientation.
+
+
+%%<cpp_commented
+if ~exist('explicit_TargetModel', 'var')
+    explicit_TargetModel = [];
+end;
+%%cpp_commented>
+
+weight_cap = 10^(Cfg.DAS.pathLossComp_GainLimit_dB/20); % the maximum of the relative weight due to pathloss
+
+time_from_ant_to_voxel = zeros(nants,nvoxels);
+est_gain_to_point = ones(nants,nvoxels); % defualt value changed to scalar for matlab2c runtime opt
+r = [xi_arena_per_region;yi_arena_per_region;zi_arena_per_region];
+
+inside_cup_validation = isPointInInnerLayer(r.', Cfg.Layers).';
+propogation_velocity_inner =  C.Vacuum_Velocity ./ sqrt(Cfg.Common.InnerMediumEpsR);
+propogation_velocityT = C.Vacuum_Velocity ./ sqrt(Cfg.Common.InnerMediumEpsR);
+num_layers = length(Cfg.Layers);
+r_path_in_each_medium_ant = zeros(num_layers+1,nvoxels,nants);% plus one is for the inner medium
+
+
+%%<cpp_commented
+if ~isempty(explicit_TargetModel)
+    TargetModel = explicit_TargetModel;
+else
+    TargetModel = Cfg.DAS.TargetModel;
+end;
+%%cpp_commented>
+
+%% Pipe model (special case, limited in other features)
+if strcmpi(TargetModel.Type, 'Pipe') % pipes in X/Y/Z/XY.. axis
+    % In this mode we assume the target is an infinite/finite
+    % "pipe" (wire) in one axis (say Y) and the refelection point
+    % will be the in Y axis doesnt occur at the imaging point 'r', but in a
+    % point between the TX and RX antennas. The point of reflection can be
+    % computed by mirroring one of the antennas to the other side of the
+    % target, and taking a straight line. The way the calculation is carried
+    % out is that we ignore the Y element when computing the path distance (as
+    % a result we get the total distance in XZ plane), and after adding the
+    % distances from the two pairs (which yields the total distance in XZ
+    % plane) we combine it (Pythagoras wise) with the Y distance (between
+    % antenans).
+    if (Cfg.RayParams.RayTracerEnable) || (num_layers > 0)
+        error('Pipe model cannot operate with ray tracer or multiple layers (hold on.. we are still working on it)');
+    end;
+    pair_to_voxel_path.Ts_pair_to_voxel = zeros(size(GeneratedData.Ants_Tx_Rx_Pairs,1), size(r,2)); % init size
+    pair_to_voxel_path.est_gain_to_point = zeros(size(GeneratedData.Ants_Tx_Rx_Pairs,1), size(r,2));  % init size
+    pair_to_voxel_path.inside_cup_validation_mat =  ones(1, size(r,2));
+    
+    orientation_hyp = 1; % a remainder to the time we had multiple hypotheses
+    pipe_orientation = TargetModel.PipeOrientation(orientation_hyp,:);
+    pipe_orientation = pipe_orientation / sqrt(sum(pipe_orientation.^2)); % normalize
+    r_along_pipe = pipe_orientation*r;
+    r_orth = r - pipe_orientation'*r_along_pipe; % remove the projection on the pipe orientation. r is column vector (per point).
+    dist_from_pipe_to_ant_orth = zeros(nants, size(r,2));
+    for ant_ind=1:nants
+        ant_loc_orth = GeneratedData.Ants_Locations(ant_ind,:) - pipe_orientation*(GeneratedData.Ants_Locations(ant_ind,:) * pipe_orientation');
+        dist_from_pipe_to_ant_orth(ant_ind,:) = sqrt(sum(bsxfun(@minus, r_orth, ant_loc_orth').^2, 1));
+    end;
+    dist_from_pipe_ant1_orth = dist_from_pipe_to_ant_orth(GeneratedData.Ants_Tx_Rx_Pairs(:,1),:); % along the axis orthgonal to the pipe
+    dist_from_pipe_ant2_orth = dist_from_pipe_to_ant_orth(GeneratedData.Ants_Tx_Rx_Pairs(:,2),:); % along the axis orthgonal to the pipe
+    Loc_along_pipe_axis_ant1 = GeneratedData.Ants_Locations(GeneratedData.Ants_Tx_Rx_Pairs(:,1),:) * pipe_orientation';
+    Loc_along_pipe_axis_ant2 = GeneratedData.Ants_Locations(GeneratedData.Ants_Tx_Rx_Pairs(:,2),:) * pipe_orientation';
+    
+    distance_pair_to_refl_point = sqrt(bsxfun(@plus, (dist_from_pipe_ant1_orth + dist_from_pipe_ant2_orth).^2, (Loc_along_pipe_axis_ant1 - Loc_along_pipe_axis_ant2).^2)); % Pythagoras
+    
+    pair_to_voxel_path.Ts_pair_to_voxel(:,:,orientation_hyp) = distance_pair_to_refl_point / propogation_velocityT * GeneratedData.FreqToTime.Fs + 1; % sample index: first sample is 1
+    pair_to_voxel_path.est_gain_to_point(:,:,orientation_hyp) = ones(size(GeneratedData.Ants_Tx_Rx_Pairs,1), size(r,2)); % pathloss estimation not active in this mode (not implemented currently)
+    
+    % check location of the hit in the pipe
+    % the result is Npairs X N locations (r)
+    % if pipe segment is defined, zeroise the pairs which fall
+    % outside the segment
+    %%<cpp_commented
+    if ~isempty(TargetModel.PipeSegmentLength)
+        % Y hit = (y1*d2 + y2*d1)/(d1+d2)
+        Lambda1 = dist_from_pipe_ant2_orth ./ (dist_from_pipe_ant1_orth + dist_from_pipe_ant2_orth);
+        refl_point_along_axis = bsxfun(@times, Loc_along_pipe_axis_ant1, Lambda1) + bsxfun(@times, Loc_along_pipe_axis_ant2, 1-Lambda1); % along pipe axis
+        hit_point_dist_from_r = abs(bsxfun(@minus, refl_point_along_axis, r_along_pipe));
+        pair_to_voxel_path.est_gain_to_point(:,:,orientation_hyp) = (hit_point_dist_from_r <= TargetModel.PipeSegmentLength/2)*1; % this will remove the pair by zeroizing its gain.
+    end;
+    %%cpp_commented>
+elseif isempty(TargetModel.Type) || strcmpi(TargetModel.Type, 'GenericReflector') % Generic reflector = "rotating mirror"
+    %% Default model (point scatterer)
+    for ant_ind=1:nants
+        %%<cpp_commented
+        if(Cfg.RayParams.RayTracerEnable && ~Cfg.DAS.HigherSnellAccuracyEnable)            
+            RayDB_ant = GeneratedData.RayDB(GeneratedData.RayDB(ant_ind).RefAntenna); % find the ref antenna and take its ray data base.
+            r_ref = bsxfun(@minus, r.' * GeneratedData.RayDB(ant_ind).RotateToRef, GeneratedData.RayDB(ant_ind).RefAntennaShift); % axis rotation to ref antenna
+            subs_for_LUT_before = max(round(bsxfun(@times,bsxfun(@minus,r_ref,RayDB_ant.LutQuantR0),1./RayDB_ant.LutQuantDelta)),0);
+            subs_for_LUT_before(:,1) = bsxfun(@min,subs_for_LUT_before(:,1),size(RayDB_ant.RayLUT,1)-1);
+            subs_for_LUT_before(:,2) = bsxfun(@min,subs_for_LUT_before(:,2),size(RayDB_ant.RayLUT,2)-1);
+            subs_for_LUT_before(:,3) = bsxfun(@min,subs_for_LUT_before(:,3),size(RayDB_ant.RayLUT,3)-1);
+            subs_for_LUT = bsxfun(@plus,subs_for_LUT_before,[1,1,1]);
+            ray_ind_vec = RayDB_ant.RayLUT(sub2ind(size(RayDB_ant.RayLUT),subs_for_LUT(:,1).',subs_for_LUT(:,2).',subs_for_LUT(:,3).')); % convert the voxel points to snell boxes
+            distance_correction = sum((r_ref - RayDB_ant.Rays.IncidentPt(ray_ind_vec,:)).*(RayDB_ant.Rays.Direction(ray_ind_vec,:)),2); % compute the delay correction using the gradient method
+            time_from_ant_to_voxel(ant_ind,:) = RayDB_ant.Rays.TimeDelayToIncident(ray_ind_vec(:)) + distance_correction/propogation_velocity_inner;
+            r_path_in_each_medium_ant(:,:,ant_ind) = [RayDB_ant.Rays.PathLengths(ray_ind_vec,:), distance_correction].';
+            est_gain_to_point(ant_ind,time_from_ant_to_voxel(ant_ind,:) == inf) = 0;
+        elseif ((Cfg.RayParams.RayTracerEnable && Cfg.DAS.HigherSnellAccuracyEnable))
+            RayDB_ant = GeneratedData.RayDB(GeneratedData.RayDB(ant_ind).RefAntenna); % find the ref antenna and take its ray data base.
+            r_ref = bsxfun(@minus, r.' * GeneratedData.RayDB(ant_ind).RotateToRef, GeneratedData.RayDB(ant_ind).RefAntennaShift); % axis rotation to ref antenna
+            RayLUT = zeros(1,size(r,2)); % at this point, zero means no ray arrives there
+            DistFromNearestRaySqr  = inf(size(RayLUT));
+            for n=1:length(RayDB_ant.Rays.Valid);
+                if (RayDB_ant.Rays.Valid(n))
+                    v_orth = null(RayDB_ant.Rays.Direction(n,:))'; % 2x3 matrix containing the null space of the direction -> orthogonal axes
+                    DistFromRaySqr = 0;
+                    for k = 1:2
+                        proj_on_orth_axis = 0;
+                        contribution_of_axis1 = v_orth(k,1)* (r(1,:) - RayDB_ant.Rays.IncidentPt(n,1)); % put the result on the right axis
+                        contribution_of_axis2 = v_orth(k,2)* (r(2,:) - RayDB_ant.Rays.IncidentPt(n,2)); % put the result on the right axis
+                        contribution_of_axis3 = v_orth(k,3)* (r(3,:) - RayDB_ant.Rays.IncidentPt(n,3)); % put the result on the right axis
+                        proj_on_orth_axis = bsxfun(@plus, bsxfun(@plus, contribution_of_axis1, contribution_of_axis2), contribution_of_axis3 );
+                        DistFromRaySqr  = DistFromRaySqr  + proj_on_orth_axis .* proj_on_orth_axis; % 3D matrix
+                    end;
+                    RayLUT((DistFromRaySqr(:) < DistFromNearestRaySqr(:))) = n;
+                    DistFromNearestRaySqr = min(DistFromNearestRaySqr, DistFromRaySqr);
+                end;
+            end;
+            distance_correction = sum((r_ref - RayDB_ant.Rays.IncidentPt(RayLUT,:)).*(RayDB_ant.Rays.Direction(RayLUT,:)),2); % compute the delay correction using the gradient method
+            time_from_ant_to_voxel(ant_ind,:) = RayDB_ant.Rays.TimeDelayToIncident(RayLUT(:)) + distance_correction/propogation_velocity_inner;
+            r_path_in_each_medium_ant(:,:,ant_ind) = [RayDB_ant.Rays.PathLengths(RayLUT,:), distance_correction].';
+            est_gain_to_point(ant_ind,time_from_ant_to_voxel(ant_ind,:) == inf) = 0;
+        else
+            %%cpp_commented>
+            % TODO:
+            if (num_layers >= 2) % travelling through 2 mediums
+                error('Ray tracing must be enabled for more than 1 layer');
+            else
+                if (num_layers == 1)
+                    propogation_velocityA = C.Vacuum_Velocity ./ sqrt(Cfg.Layers{1}.EpsR);
+                    [AE,TE,inside_cup_validation] = CalcCrossPointTwoEps(GeneratedData.Ants_Locations(ant_ind,:),r,Cfg.Layers,Cfg.Common.InnerMediumEpsR);
+                    time_from_ant_to_voxel(ant_ind,:) = AE/propogation_velocityA + TE/propogation_velocityT;
+                    r_path_in_each_medium_ant(:,:,ant_ind) = [AE; TE];% store path lengths in inner and outer medium for path-loss calculations
+                else % == 0 - all is in one medium
+                    A = GeneratedData.Ants_Locations(ant_ind,:);
+                    T = r;
+                    AT = sqrt(   (T(1,:)-A(1)).^2+(T(2,:)-A(2)).^2+(T(3,:)-A(3)).^2   );
+                    inside_cup_validation = ones(1, size(r,2));
+                    time_from_ant_to_voxel(ant_ind,:) = AT/propogation_velocityT;
+                    r_path_in_each_medium_ant(1,:,ant_ind) = [AT];% store path lengths in inner and outer medium for path-loss calculations
+                end;
+            end
+            %%<cpp_commented
+        end
+        %%cpp_commented>
+        if (Cfg.DAS.pathLossComp_Mode > 0)
+            % calculate attenuation in material
+            % sum along the ant axis (antenna path) and then multiply with loss of each material and sum again
+            pathloss_dB = Cfg.DAS.pathLossComp_LossPerMedia_dBcm(1:size(r_path_in_each_medium_ant,1)) * reshape(r_path_in_each_medium_ant(:,:,ant_ind),size(r_path_in_each_medium_ant,1),size(r_path_in_each_medium_ant,2)) / 0.01;
+            est_gain_to_point(ant_ind,time_from_ant_to_voxel(ant_ind,:) ~= inf) = 10.^(-pathloss_dB(time_from_ant_to_voxel(ant_ind,:) ~= inf)/20);
+            % add attenuation due to other factors: free space loss, refraction,
+            if (Cfg.DAS.pathLossComp_includeSpaceLoss)
+                r_vec_ant = sum(r_path_in_each_medium_ant(:,:,ant_ind), 1); % total path from ant
+                est_gain_to_point(ant_ind,time_from_ant_to_voxel(ant_ind,:) ~= inf) = est_gain_to_point(ant_ind,time_from_ant_to_voxel(ant_ind,:) ~= inf) ./ (r_vec_ant(time_from_ant_to_voxel(ant_ind,:) ~= inf)./10e-2); % normalizer 10cm is typical distance in this array
+            end
+            if (Cfg.DAS.pathLossComp_includeRefractionTransitionLoss)
+                error('No support in current version for pathLossComp_includeRefractionTransitionLoss');
+            end
+        elseif (Cfg.DAS.flag_fix_dis_att==1) % backward compatibility
+            r_vec_ant = sum(r_path_in_each_medium_ant(:,:,ant_ind), 1); % total path from ant
+            pair_relative_weight = (r_vec_ant./1e-2);
+            est_gain_to_point(ant_ind,time_from_ant_to_voxel(ant_ind,:) ~= inf) = 1 ./ pair_relative_weight;
+        end
+    end    
+    %% Inflate the antenna path matricies to a pairs matrix
+    pair_to_voxel_path.Ts_pair_to_voxel = (time_from_ant_to_voxel(GeneratedData.Ants_Tx_Rx_Pairs(:,1),:) + time_from_ant_to_voxel(GeneratedData.Ants_Tx_Rx_Pairs(:,2),:))* GeneratedData.FreqToTime.Fs + 1;
+    pair_to_voxel_path.inside_cup_validation_mat = logical(inside_cup_validation);
+    pair_to_voxel_path.est_gain_to_point = (est_gain_to_point(GeneratedData.Ants_Tx_Rx_Pairs(:,1),:) .* est_gain_to_point(GeneratedData.Ants_Tx_Rx_Pairs(:,2),:)); % pathloss estimation
+    pair_to_voxel_path.r_path_in_each_medium_ant = r_path_in_each_medium_ant;
+    pair_to_voxel_path.r_path_in_each_medium_pair = r_path_in_each_medium_ant(:,:,(GeneratedData.Ants_Tx_Rx_Pairs(:,1))) + r_path_in_each_medium_ant(:,:,(GeneratedData.Ants_Tx_Rx_Pairs(:,2)));
+elseif strcmpi(TargetModel.Type, 'Mirror') || strcmpi(TargetModel.Type, 'Corner2Way') || strcmpi(TargetModel.Type, 'Corner3Way')
+    % What the models above share in common is that they model reflection from surfaces and 
+    % their implementation by reflection of antennas (i.e. definition of effective
+    % antennas). 
+    % Mirror: Passes through point r, further defined by TargetModel.MirrorOrientation
+    % Corner2Way: orthogonal intersection between two walls/mirrors. The line of intersection passes through point r in direction TargetModel.CornerAxis 
+    %  notice the orientation of the walls themselves is not defined here and is less important.
+    %  also notice the model below defines only time delays and ignores the fact a corner inverts the polarizations
+    %  HH,VV (so simple DAS summation is not recommended).
+    % Corner3Way: orthogonal intersection between 3 walls/mirrors. As in corner2Way, orientation is less important (does
+    %   not affect delay). 
+    %  See G:\RnD\Algo\Apps\Room imaging\Room estimation.docx for details on corner models.
+    if (Cfg.RayParams.RayTracerEnable) || (num_layers > 0)
+        error('Mirror/Corner model cannot operate with ray tracer or multiple layers (hold on.. we are still working on it)');
+    end;
+    pair_to_voxel_path.Ts_pair_to_voxel = zeros(size(GeneratedData.Ants_Tx_Rx_Pairs,1), size(r,2)); % init size
+    pair_to_voxel_path.est_gain_to_point = zeros(size(GeneratedData.Ants_Tx_Rx_Pairs,1), size(r,2));  % init size
+    pair_to_voxel_path.inside_cup_validation_mat =  true(1, size(r,2));
+    
+    % Generate ants_reflected: antennas reflected to other side of mirror, per r point.
+    % Dimensions: Ants X Points (r) X 3dim
+    pairs = GeneratedData.Ants_Tx_Rx_Pairs;
+    if strcmpi(TargetModel.Type, 'Mirror')
+        if ~isempty(TargetModel.MirrorOrientation) % mirror orientation given by the user
+            % ants_reflected = ant_location - 2 * ((ant_location - r)*orientation') * orientation
+            % The expression is opened in order to save computations and there is a lot of reshaping...
+            ants_reflected = bsxfun(@minus, permute(GeneratedData.Ants_Locations, [1,3,2]), ...
+                2 * bsxfun(@times, bsxfun(@minus, GeneratedData.Ants_Locations*TargetModel.MirrorOrientation', TargetModel.MirrorOrientation*r), reshape(TargetModel.MirrorOrientation, 1, 1, []))); % subtract twice the projection on the mirror, to translate the point to the other side.
+        else
+            % "Mirror directed to me" model: at each point r assume the
+            % mirror is directed toward an arbitrary point in the array.
+            % Notice that if we see the mirror (in a regular DAS) image at a given point it usually means the
+            % mirror is directed to the array, plus, assuming we scan over
+            % all points r, this effectively scans all mirror orientations
+            % (and thus all possible infinite mirrors).
+            ants_perm = permute(GeneratedData.Ants_Locations, [1,3,2]); % Ants X 1 X 3
+            r_perm = permute(r, [3 2 1]); % 1 X Points X 3
+            focus_point = permute(mean(GeneratedData.Ants_Locations, 1), [1 3 2]); % 1x1x3
+            orientation = bsxfun(@minus, r_perm, focus_point); % 1 X Points X 3
+            orientation = bsxfun(@rdivide, orientation, sqrt(sum(orientation.^2, 3))); % normalize
+            % same formula as above, written a bit differently:
+            % X' = X - 2*d'*(X-r)*d (X = antenna location, r = point, d = orientation).
+            ants_reflected = bsxfun(@minus, ants_perm, ...
+                2*bsxfun(@times, orientation, sum(bsxfun(@times, bsxfun(@minus, ants_perm, r_perm), orientation),3)));
+        end;
+    elseif strcmpi(TargetModel.Type, 'Corner2Way')
+        % for 2 way corner the antenna is just reflected to the other side of the corner
+        % in the plane orthogonal to the axis (as in 3way corner), and remains in the same position in the corner's axis
+        % (as in a mirror or a pipe).
+        % let: ants_reflected3 =  2*r - ant_location (as in 3 way corner)
+        % then if "a" is the axis, then the following expression replaces ants_reflected3 with 
+        %   ant_location along axis a:
+        % ants_reflected = ants_reflected3 + (a^T * ant_location - a^T * ants_reflected3) * a  
+        %    =  2 * r - ant_location + 2 a^T (ant_location - r) * a
+        %    = ant_location - { 2*(ant_location - r) - 2 a^T (ant_location - r) * a )
+        % the 3 different expressions above are 3 different ways of looking at it (as correction to ants_reflected3
+        %  or as subtracting from ant_location two times the vector ant_location - r, after removing from it
+        %  its component along "a" axis.
+        % The expression is opened in order to save computations and there is a lot of reshaping...
+        ants_reflected = bsxfun(@minus, permute(2*r, [3,2,1]), permute(GeneratedData.Ants_Locations, [1,3,2])); % start with 3 way
+        ants_reflected = ants_reflected + bsxfun(@times, bsxfun(@minus, 2 * GeneratedData.Ants_Locations * (TargetModel.CornerAxis'), 2 * TargetModel.CornerAxis * r), reshape(TargetModel.CornerAxis, [1,1,3])); % correction term for 2 way
+    elseif strcmpi(TargetModel.Type, 'Corner3Way')
+        % for 3 way corner the antenna is just inverted to the other side of the corner
+        % ants_reflected = -(ant_location - r) +  r = 2*r - ant_location
+        ants_reflected = bsxfun(@minus, permute(2*r, [3,2,1]), permute(GeneratedData.Ants_Locations, [1,3,2]));
+    else
+        error('internal error');
+    end;
+    
+    distance_pair_to_refl_point = sqrt(sum(bsxfun(@minus, permute(GeneratedData.Ants_Locations(pairs(:,1), :), [1,3,2]), ants_reflected(pairs(:,2), :, :)).^2, 3));
+    
+    pair_to_voxel_path.Ts_pair_to_voxel(:,:) = distance_pair_to_refl_point / propogation_velocityT * GeneratedData.FreqToTime.Fs + 1;
+    pair_to_voxel_path.est_gain_to_point(:,:) = ones(size(GeneratedData.Ants_Tx_Rx_Pairs,1), size(r,2)); % pathloss estimation not active in this mode (not implemented currently)
+else
+    error('Unknown TargetModel.Type');
+end
+% TODO - the reason this computation is here is for runtime reasons. it
+% should be computed in modelAlgDAS
+% pair_to_voxel_path.pair_relative_weight_due_to_pathloss = min(pair_to_voxel_path.est_gain_to_point.^(-Cfg.DAS.pathLossComp_InversionFactor), weight_cap).*(pair_to_voxel_path.est_gain_to_point ~= 0); % this is the weight (which will be multiplied with the skin) to produce the weight of the estimator
+
+% If we are not using the inside_cup_validation, change the struct to a
+% scalar to reduce memory and run time requirments.
+if ~Cfg.Common.flag_inside_cup_validation
+    pair_to_voxel_path.inside_cup_validation_mat = 1;
+end;
+
+end
+
+
+
+
+
+
