@@ -1,0 +1,7 @@
+ ts_mat_ind_low = fix(ts_mat);
+    ts_mat_ind_hi = ceil(ts_mat);
+    pair_ix_mat =  (1:1:size(ts_mat,1)).';
+    idx_low = bsxfun(@plus,pair_ix_mat,(ts_mat_ind_low-1)*size(refl_matrix,1));
+    idx_hi = bsxfun(@plus,pair_ix_mat,(ts_mat_ind_hi-1)*size(refl_matrix,1));
+    slope = ts_mat - ts_mat_ind_low;
+    sig_result = refl_matrix(idx_low).*(1-slope) +refl_matrix(idx_hi).*slope;
