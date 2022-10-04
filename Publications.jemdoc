@@ -11,6 +11,11 @@
 . O. Longman, I. Bilik, S. Villeval, and S. Shayovitz, \"Mitigation of Vehicle Vibration Effect on
 Automotive MIMO Radar\",In Proceedings of the IEEE Radar Conference (RadarConf), 2019. \[[radarconf2019.pdf pdf]\]
 . Shachar Shayovitz, Meir Feder, \"Minimax Active Learning via Minimal Model Capacity\", Presented in the IEEE Machine Learning for Signal Processing Workshop (MLSP), 2019. \[[mlsp2019.pdf pdf]\] \[[MLSP_2019_Minimax_Active_Learning_via_Minimal_Model_Capacity.pdf Presentation]\] (*Best Paper Award Finalist*). 
+. Shayovitz, Shachar, and Meir Feder. \"Universal Active Learning via Conditional Mutual Information Minimization.\" IEEE Journal on Selected Areas in Information Theory, 2021 \[[Universal_Active_Learning_via_Conditional_Mutual_Information_Minimization.pdf pdf]\]
+. Shayovitz, Shachar, Andrey Krestiantsev, and Dan Raphaeli. \"Low-Complexity Self-Interference Cancellation for Multiple Access Full Duplex Systems\" Sensors 22.4 (2022) \[[sensors-22-01485.pdf pdf]\]
+. Shachar Shayovitz, Meir Feder, \"Active Learning for Individual Data via Minimal
+Stochastic Complexity\", Presented in the 58th Annual Allerton Conference on Communication,
+Control, and Computing, 2022. \[[Universal_Active_Learning_with_Individual_Data_paper.pdf pdf]\] \[[Universal_Active_Learning_with_Individual_Data_presentation.pdf Presentation]\]
 . Shachar Shayovitz, Dan Raphaeli, \"Correction to "Dynamically regularized RLS-DCD
 algorithm and its FPGA implementation\", Unpublished October 2017. \[[correction.pdf pdf]\]
 . M.Sc Thesis \" Message passing algorithms for phase noise tracking using tikhonov mixtures\", \[[thesis_book.pdf Book]\] \[[thesis_ppt.pdf Seminar Presentation]\]
