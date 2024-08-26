@@ -13,10 +13,13 @@ Google Patents \[[https://patents.google.com/?inventor=shachar+shayovitz&oq=shac
 ~~~
 
 == About me
-I am an algorithm researcher at Huawei's Tel Aviv Research Center, working on wireless communications algorithms for WiFi. I research diverese PHY and MAC topics such as: iterative MIMO detection algorithms, Deep Reinformecment Learning for WiFi congestion control and more.\n
-I also teach the graduate level course "Digital Transmission of Signals" in the EE school in Tel Aviv university.\n
-I've spent over a decade working on algorithms for communications and sensing at Intel, Vayyar Imaging, Corning Optical Communications, General Motors Research and Apple.\n
-I hold a PhD ("Information Theoretic Active Learning") in Electrical Engineering, which I completed under the supervision of Prof. Meir Feder.\n 
+I am an algorithm researcher at Huawei's Tel Aviv Research Center, specializing in wireless communications algorithms for WiFi.\n 
+My research spans a variety of PHY and MAC topics, including iterative MIMO detection algorithms and Deep Reinforcement Learning for WiFi congestion control.\n 
+In addition to my work at Huawei, I teach the graduate course “Digital Transmission of Signals” at Tel Aviv University's Electrical Engineering School.\n
+
+With over a decade of experience in developing algorithms for communications and sensing, I have held positions at Intel, \n 
+Vayyar Imaging, Corning Optical Communications, General Motors Research, and Apple. \n
+I hold a PhD in Electrical Engineering, with a focus on "Information Theoretic Active Learning," which I completed under the guidance of Prof. Meir Feder. \n
 
 == Research
 My research interests include: 
