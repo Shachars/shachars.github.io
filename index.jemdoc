@@ -1,10 +1,10 @@
 # jemdoc: menu{MENU}{index.html}, nofooter  
-==Shachar Shayovitz 
+==Shachar Shayovitz, PhD. 
 
 ~~~
 {}{img_left}{photos/Shachar Shayovitz.jpg}{alt text}{150}{210}
-PhD Candidate,\n [http://www.eng.tau.ac.il Department of Electrical Engineering], \n[http://www.tau.ac.il Tel Aviv University (TAU)]\n
-Tel Aviv, Israel \n 
+Wireless Researcher | IEEE Senior Member | Adjunct Lecturer in Tel Aviv University | Kayakist\n
+Huawei Tel Aviv Research Center, Israel \n 
 E-post: /shachar.shay/ \[@\] gmail \[DOT\] com \n
 GitHub \[[https://github.com/Shachars?tab=repositories Link]\] \n
 Google Scholar \[[https://scholar.google.co.il/citations?user=6LgtCXMAAAAJ&hl=en Link]\]\n
@@ -13,13 +13,15 @@ Google Patents \[[https://patents.google.com/?inventor=shachar+shayovitz&oq=shac
 ~~~
 
 == About me
-I am studying towards my PhD in Electrical Engineering under the supervision of Prof. Meir Feder. I am currently working on the relationship between Information Theory and Machine Learning (In particular active and online learning).\n I am also a researcher at Apple, working on wireless sensing algorithms.\n
-I've spent several years working on algorithms for communications and radar systems at Intel, Vayyar Imaging, Corning Optical Communications, General Motors Research and Apple.
+I am an algorithm researcher at Huawei's Tel Aviv Research Center, working on wireless communications algorithms for WiFi. I research diverese PHY and MAC topics such as: iterative MIMO detection algorithms, Deep Reinformecment Learning for WiFi congestion control and more.\n
+I also teach the graduate level course "Digital Transmission of Signals" in the EE school in Tel Aviv university.\n
+I've spent over a decade working on algorithms for communications and sensing at Intel, Vayyar Imaging, Corning Optical Communications, General Motors Research and Apple.\n
+I hold a PhD ("Information Theoretic Active Learning") in Electrical Engineering, which I completed under the supervision of Prof. Meir Feder.\n 
 
 == Research
-My research interests include 
-- Information Theory  
-- Machine Learning
+My research interests include: 
+- Information Theory
+- Deep Reinformecment Learning
 - Radar Signal Processing
-- Statistical Signal Processing
+- Probabalistic Graphical Models
 

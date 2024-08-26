@@ -16,6 +16,9 @@ Automotive MIMO Radar\",In Proceedings of the IEEE Radar Conference (RadarConf),
 . Shachar Shayovitz, Meir Feder, \"Active Learning for Individual Data via Minimal
 Stochastic Complexity\", Presented in the 58th Annual Allerton Conference on Communication,
 Control, and Computing, 2022. \[[Universal_Active_Learning_with_Individual_Data_paper.pdf pdf]\] \[[Universal_Active_Learning_with_Individual_Data_presentation.pdf Presentation]\]
+. Shachar Shayovitz, Koby Bibas and  Meir Feder, \"Deep Individual Active Learning: Safeguarding against Out-of-Distribution Challenges in Neural Networks\" Entropy 26.2 (2024) \[[entropy-26-00129-v2.pdf pdf]\] \[ [https://github.com/kobybibas/pnml_for_active_learning GitHub ]\]
+. Shachar Shayovitz, Meir Feder, \"Active Learning via Predictive Normalized Maximum Likelihood Minimization\" IEEE Transactions on Information Theory, 2024. \[[https://ieeexplore.ieee.org/abstract/document/10540408 pdf]\]
 . Shachar Shayovitz, Dan Raphaeli, \"Correction to "Dynamically regularized RLS-DCD
 algorithm and its FPGA implementation\", Unpublished October 2017. \[[correction.pdf pdf]\]
 . M.Sc Thesis \" Message passing algorithms for phase noise tracking using tikhonov mixtures\", \[[thesis_book.pdf Book]\] \[[thesis_ppt.pdf Seminar Presentation]\]
+. Ph.D Thesis \"Information Theoretic Active Learning\", \[[phd_thesis_book.pdf Book]\] \[[phd_thesis_ppt.pdf Seminar Presentation]]\]
