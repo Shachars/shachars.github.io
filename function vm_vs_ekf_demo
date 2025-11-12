@@ -1,0 +1,170 @@
+function vm_vs_ekf_demo
+clc; clear; close all;
+
+%% Parameters
+A              = 1.0;
+snr_db_time    = -35;     % for time-evolution plot
+trials_time    = 100;
+N              = 200;     % samples per trial
+sigma_wtheta   = 1e-3;    % phase noise std
+sigma_womega   = 1e-4;    % freq RW std
+omega_true     = 0.05;    % true phase increment [rad/sample]
+init_freq_err  = 0.05;    % same init bias for both filters
+
+rng(0);
+
+%% MSE vs time at SNR = snr_db_time
+[mseE, mseV] = monte_carlo_run(A, snr_db_time, trials_time, N, ...
+    sigma_wtheta, sigma_womega, omega_true, init_freq_err);
+
+figure;
+semilogy(mseE, 'LineWidth', 1.5); hold on;
+semilogy(mseV, 'LineWidth', 1.5);
+grid on; xlabel('k'); ylabel('MSE(\omega) [rad^2/sample^2]');
+title(sprintf('Frequency MSE vs time (SNR = %d dB)', snr_db_time));
+legend('EKF (Re/Im)','VM–Gaussian','Location','best');
+
+%% Final MSE vs SNR sweep
+snr_list = -35:5:0;
+finalE = zeros(size(snr_list));
+finalV = zeros(size(snr_list));
+trials_sweep = 60;
+
+for i=1:numel(snr_list)
+    snr = snr_list(i);
+    [mseE2, mseV2] = monte_carlo_run(A, snr, trials_sweep, N, ...
+        sigma_wtheta, sigma_womega, omega_true, init_freq_err);
+    finalE(i) = mseE2(end);
+    finalV(i) = mseV2(end);
+end
+
+figure;
+semilogy(snr_list, finalE, 'o-','LineWidth',1.5); hold on;
+semilogy(snr_list, finalV, 's-','LineWidth',1.5);
+grid on; xlabel('SNR [dB]'); ylabel('Final MSE(\omega) [rad^2/sample^2]');
+title('Frequency tracking performance vs SNR');
+legend('EKF (Re/Im)','VM–Gaussian','Location','best');
+
+end
+
+% ------------------------------------------------------------
+function [omega_mse_ekf, omega_mse_vm] = monte_carlo_run( ...
+    A, snr_db, trials, N, sigma_wtheta, sigma_womega, omega_true, init_freq_err)
+
+sigma_n2 = A^2 / (10^(snr_db/10));      % complex noise variance
+sigma_n  = sqrt(sigma_n2/2);            % per real/imag std
+
+F = [1 1; 0 1];
+Q = diag([sigma_wtheta^2, sigma_womega^2]);
+R = (sigma_n^2)*eye(2);                 % measurement noise for [Re, Im]
+
+omega_mse_ekf = zeros(N,1);
+omega_mse_vm  = zeros(N,1);
+
+for tr=1:trials
+    % ----- Generate truth & observations -----
+    theta = zeros(N,1); omega = zeros(N,1);
+    theta(1) = 0; omega(1) = omega_true;
+    y = zeros(N,1);
+
+    for k=1:N
+        n = sigma_n*(randn+1j*randn);
+        y(k) = A*exp(1j*theta(k)) + n;
+        if k < N
+            omega(k+1) = omega(k) + sigma_womega*randn;
+            theta(k+1) = theta(k) + omega(k) + sigma_wtheta*randn;
+        end
+    end
+
+    % ----- EKF init -----
+    x = [0; omega_true+init_freq_err];
+    P = diag([pi^2, 0.1]);
+
+    % ----- VM–Gaussian init -----
+    mu_theta = 0; kappa_theta = 1e-3;   % near uniform
+    m_omega  = omega_true+init_freq_err; 
+    P_omega  = 0.1;
+
+    for k=1:N
+        %% ===== EKF step =====
+        % Prediction
+        x_pred = F*x;
+        P_pred = F*P*F' + Q;
+        theta_pred = x_pred(1);
+
+        % Measurement
+        z = [real(y(k)); imag(y(k))];
+        h = [A*cos(theta_pred); A*sin(theta_pred)];
+        H = [-A*sin(theta_pred), 0;
+              A*cos(theta_pred), 0];
+
+        S = H*P_pred*H' + R;
+        K = P_pred*H'/S;
+        innov = z - h;
+        x = x_pred + K*innov;
+        P = (eye(2)-K*H)*P_pred;
+
+        %% ===== VM–Gaussian step =====
+        % Prediction (circular moment)
+        if kappa_theta < 1e-6
+            Rprev = 0;
+        else
+            if kappa_theta < 1
+                Rprev = kappa_theta/2;
+            else
+                Rprev = 1 - 1/(2*kappa_theta);
+            end
+        end
+        Cprev = Rprev*exp(1j*mu_theta);
+
+        m_omega_minus = m_omega;
+        P_omega_minus = P_omega + sigma_womega^2;
+
+        damping = exp(-0.5*(P_omega_minus + sigma_wtheta^2));
+        Cpred   = Cprev * exp(1j*m_omega_minus) * damping;
+        Rpred   = abs(Cpred);
+        mu_theta_minus = angle(Cpred);
+        kappa_theta_minus = R_to_kappa(Rpred);
+
+        % Measurement VM params
+        phi = angle(y(k));
+        rk  = abs(y(k));
+        kappa_meas = 2*A*rk/sigma_n2;
+
+        % Phase update (exact VM)
+        aprior = kappa_theta_minus*exp(1j*mu_theta_minus);
+        ameas  = kappa_meas*exp(1j*phi);
+        apost  = aprior + ameas;
+        mu_theta   = angle(apost);
+        kappa_theta= abs(apost);
+
+        % Frequency update (info form)
+        g = kappa_meas * sin(phi - mu_theta_minus);
+        J = kappa_meas * cos(phi - mu_theta_minus);
+        if J < 0, J = 0; end
+        P_omega = 1/(1/P_omega_minus + J);
+        m_omega = m_omega_minus + P_omega*g;
+
+        % Accumulate errors
+        omega_mse_ekf(k) = omega_mse_ekf(k) + (x(2)-omega(k))^2;
+        omega_mse_vm(k)  = omega_mse_vm(k)  + (m_omega-omega(k))^2;
+    end
+end
+
+omega_mse_ekf = omega_mse_ekf / trials;
+omega_mse_vm  = omega_mse_vm  / trials;
+
+end
+
+% ------------------------------------------------------------
+function kappa = R_to_kappa(R)
+% Approx inverse of A(kappa)=I1/I0 (piecewise, standard in circular stats)
+R = max(0,min(0.999999, R));  % clamp
+if R < 0.53
+    kappa = 2*R + R.^3 + 5*R.^5/6;
+elseif R < 0.85
+    kappa = -0.4 + 1.39*R + 0.43./(1-R);
+else
+    kappa = 1./(R.^3 - 4*R.^2 + 3*R);
+end
+end
