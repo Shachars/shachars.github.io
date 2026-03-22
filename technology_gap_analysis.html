@@ -1,0 +1,54 @@
+<style>
+.gap-table { width:100%; border-collapse:collapse; font-size:13px; }
+.gap-table th { padding:10px 14px; text-align:left; font-weight:500; font-size:12px; letter-spacing:0.03em; }
+.gap-table td { padding:9px 14px; vertical-align:top; line-height:1.5; }
+.gap-table tr { border-bottom:0.5px solid var(--color-border-tertiary); }
+.gap-table tr:last-child { border-bottom:none; }
+.gap-table .dim { color:var(--color-text-secondary); }
+.th-left { background:var(--color-background-secondary); color:var(--color-text-secondary); width:22%; border-radius:var(--border-radius-md) 0 0 0; }
+.th-old { background:#FCEBEB; color:#791F1F; width:39%; }
+.th-new { background:#EAF3DE; color:#27500A; width:39%; border-radius:0 var(--border-radius-md) 0 0; }
+@media (prefers-color-scheme: dark) {
+  .th-old { background:#501313; color:#F7C1C1; }
+  .th-new { background:#173404; color:#C0DD97; }
+}
+.old-cell { color:var(--color-text-danger); }
+.new-cell { color:var(--color-text-success); }
+.dim-row { background:var(--color-background-secondary); }
+</style>
+<table class="gap-table">
+  <thead>
+    <tr>
+      <th class="th-left">Dimension</th>
+      <th class="th-old">Current state — what's missing</th>
+      <th class="th-new">IEEE 802.11 AI Offload — what it adds</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="dim">AI capability advertisement</td>
+      <td class="old-cell">No network-layer mechanism to announce AI compute capabilities. Devices rely on mDNS or proprietary app-layer discovery.</td>
+      <td class="new-cell">AP beacon and probe frames carry AI types, modalities (text, image, voice, video), and performance parameters natively.</td>
+    </tr>
+    <tr class="dim-row">
+      <td class="dim">Session & authorization</td>
+      <td class="old-cell">No AI session concept in 802.11. Model loading, resource allocation, and security must be handled by each application separately.</td>
+      <td class="new-cell">Structured setup request/response with service hash, session ID, security keys, and model URL — integrated into WPA3 framework.</td>
+    </tr>
+    <tr>
+      <td class="dim">Inference data transport</td>
+      <td class="old-cell">AI runtimes (ONNX, TFLite) are application-layer only. No standardized format for exchanging input/output vectors over Wi-Fi.</td>
+      <td class="new-cell">Standardized transport for inference vectors in protobuf and ONNX. Vendor-neutral across all edge compute platforms.</td>
+    </tr>
+    <tr class="dim-row">
+      <td class="dim">Model certification</td>
+      <td class="old-cell">No industry-wide requirements for model quality, quantization, or size. Edge models are entirely self-certified by publishers.</td>
+      <td class="new-cell">Formal certification framework: quantization standards, fixed-point granularity, max model size — enforced at download time.</td>
+    </tr>
+    <tr>
+      <td class="dim">Agent-to-agent comms</td>
+      <td class="old-cell">Agentic AI (A2A, MCP) has no wireless network-layer support. Agents rely on ad-hoc application routing with no standardized discovery.</td>
+      <td class="new-cell">802.11 discovery extended to support A2A and MCP protocols, enabling distributed agentic AI across Wi-Fi infrastructure.</td>
+    </tr>
+  </tbody>
+</table>

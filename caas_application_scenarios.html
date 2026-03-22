@@ -1,0 +1,70 @@
+<style>
+.scenarios { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; padding:4px 0; }
+.card { background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-lg); padding:14px 16px 14px 18px; border-left-width:3px; cursor:pointer; transition:background 0.15s; }
+.card:hover { background:var(--color-background-secondary); }
+.card-title { font-size:14px; font-weight:500; color:var(--color-text-primary); margin:0 0 4px; }
+.card-sub { font-size:12px; color:var(--color-text-secondary); margin:0 0 10px; }
+.card-body { font-size:12px; color:var(--color-text-secondary); line-height:1.55; margin:0 0 10px; }
+.badges { display:flex; flex-wrap:wrap; gap:5px; }
+.badge { font-size:11px; padding:2px 8px; border-radius:4px; font-weight:500; }
+.card-wide { grid-column:1/-1; }
+</style>
+<div class="scenarios">
+
+<div class="card" style="border-left-color:#1D9E75" onclick="sendPrompt('Tell me more about the smart home vision analytics scenario for CaaS')">
+  <p class="card-title">Smart home vision analytics</p>
+  <p class="card-sub">Consumer / residential</p>
+  <p class="card-body">Wi-Fi cameras offload frame inference to the CaaS AP — object detection, person recognition, anomaly detection — and receive structured event outputs. No cloud dependency, sub-50ms latency, full data privacy.</p>
+  <div class="badges">
+    <span class="badge" style="background:#E1F5EE;color:#085041">Privacy-preserving</span>
+    <span class="badge" style="background:#E1F5EE;color:#085041">&lt;50ms latency</span>
+    <span class="badge" style="background:#E1F5EE;color:#085041">No cloud needed</span>
+  </div>
+</div>
+
+<div class="card" style="border-left-color:#378ADD" onclick="sendPrompt('Tell me more about the enterprise conversational AI scenario for CaaS')">
+  <p class="card-title">Enterprise conversational AI</p>
+  <p class="card-sub">Enterprise / compliance-sensitive</p>
+  <p class="card-body">Thin clients and meeting room systems offload LLM inference to an edge AP. Sensitive enterprise data — records, communications — never leaves the local network. Directly addresses GDPR and data residency requirements.</p>
+  <div class="badges">
+    <span class="badge" style="background:#E6F1FB;color:#0C447C">Data sovereignty</span>
+    <span class="badge" style="background:#E6F1FB;color:#0C447C">GDPR-aligned</span>
+    <span class="badge" style="background:#E6F1FB;color:#0C447C">On-premises LLM</span>
+  </div>
+</div>
+
+<div class="card" style="border-left-color:#BA7517" onclick="sendPrompt('Tell me more about the industrial IoT scenario for CaaS')">
+  <p class="card-title">Industrial IoT &amp; robotics</p>
+  <p class="card-sub">Manufacturing / industrial</p>
+  <p class="card-body">Factory sensors and mobile robots offload predictive maintenance, visual quality control, and navigation AI to Wi-Fi APs on the shop floor. Operates without cloud connectivity — critical for safety-sensitive environments.</p>
+  <div class="badges">
+    <span class="badge" style="background:#FAEEDA;color:#633806">Offline-capable</span>
+    <span class="badge" style="background:#FAEEDA;color:#633806">Safety-critical</span>
+    <span class="badge" style="background:#FAEEDA;color:#633806">Real-time control</span>
+  </div>
+</div>
+
+<div class="card" style="border-left-color:#7F77DD" onclick="sendPrompt('Tell me more about the smart building agentic AI scenario for CaaS')">
+  <p class="card-title">Smart building agentic AI</p>
+  <p class="card-sub">Facilities / building automation</p>
+  <p class="card-body">Climate, security, occupancy, and energy agents discover each other via 802.11 A2A discovery and coordinate autonomously. The first Wi-Fi scenario requiring the standardized inter-agent discovery layer.</p>
+  <div class="badges">
+    <span class="badge" style="background:#EEEDFE;color:#3C3489">A2A / MCP</span>
+    <span class="badge" style="background:#EEEDFE;color:#3C3489">Autonomous agents</span>
+    <span class="badge" style="background:#EEEDFE;color:#3C3489">Wi-Fi-native</span>
+  </div>
+</div>
+
+<div class="card card-wide" style="border-left-color:#D85A30" onclick="sendPrompt('Tell me more about the healthcare AI scenario for CaaS')">
+  <p class="card-title">Healthcare &amp; assistive technology</p>
+  <p class="card-sub">Clinical / regulated environments</p>
+  <p class="card-body">Medical devices and assistive technology offload patient monitoring, diagnostic support, and voice interface AI to CaaS APs within the clinical network perimeter. Strict data privacy requirements preclude cloud usage — local inference is the only viable architecture. Directly aligned with HIPAA and emerging medical AI regulations.</p>
+  <div class="badges">
+    <span class="badge" style="background:#FAECE7;color:#4A1B0C">HIPAA-aligned</span>
+    <span class="badge" style="background:#FAECE7;color:#4A1B0C">Patient data stays local</span>
+    <span class="badge" style="background:#FAECE7;color:#4A1B0C">Diagnostic support</span>
+    <span class="badge" style="background:#FAECE7;color:#4A1B0C">Voice interface AI</span>
+  </div>
+</div>
+
+</div>
